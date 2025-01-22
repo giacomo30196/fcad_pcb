@@ -12,11 +12,16 @@ from FreeCAD import Console,Vector,Placement,Rotation
 import DraftGeomUtils,DraftVecUtils
 import Path
 
+
+import ast
+
 import sys, os
 import re
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from .kicad_parser import KicadPCB,SexpList,SexpParser,parseSexp
 from .kicad_parser import unquote
+ 
+
 
 PY3 = sys.version_info[0] == 3
 if PY3:
@@ -729,34 +734,39 @@ class KicadFcad:
 
     def _initStackUp(self):
         if self.stackup is None:
-            self.stackup = []
-            stackup = getattr(getattr(self.pcb, 'setup', None), 'stackup', None)
+            self.stackup = [] 
+            stackup = getattr(getattr(self.pcb, 'setup', None), 'stackup', None) 
             if stackup:
                 try:
                     # If no stackup given by user, extract stack info from setup
                     offset = 0.0
                     last_copper = 0.0
-                    for layer in stackup.layer:
+                    for layer in stackup.layer:   
                         layer_type, _ = self.findLayer(layer[0], 99)
                         t = getattr(layer, 'thickness',
-                                self.copper_thickness if layer_type<=32 else self.layer_thickness)
+                                self.copper_thickness if layer_type<=32 else self.layer_thickness) 
                         if layer_type <= 31:
                             last_copper = offset
                         # Some layer (e.g. dielectric) may have more than one
                         # thickness field. Add them all.
-                        if isinstance(t, SexpList):
+                        if isinstance(t, SexpList): 
+                            """ self._log('layer {}, t0 {}, t1 {}',str(layer[0]), str(t[0]),  str(t[1]), level='warning')  """
                             total = 0.0
-                            for tt in t:
+                            for tt in t: 
                                 # And for some thickness field, there may be additional
-                                # attribute, like (thickness, 0.05, locked).
-                                if isinstance(tt, (float, int)):
-                                    total += tt
+                                # attribute, like (thickness, 0.05, locked).   
+                                ttList = ast.literal_eval(str(tt))
+                                """ self._log('type(ttList): {}', str(type(ttList)), level='warning')  """
+                                if isinstance(ttList, list):
+                                    total += float(str(ttList[0]))
                                 else:
-                                    total += tt[0]
-                            t = total
-                        elif not isinstance(t, (float, int)):
-                            t = t[0]
+                                    total += float(str(tt))
 
+                                """ self._log('total thickness: {}', str(total), level='warning') """
+                          
+                            t = total 
+                        elif not isinstance(t, (float, int)):
+                            t = t[0] 
                         offset -= t
                         self.stackup.append([unquote(layer[0]), offset, t])
 
@@ -766,11 +776,11 @@ class KicadFcad:
                     for entry in self.stackup:
                         entry[1] -= last_copper
                 except Exception as e:
-                    self._log('Failed parsing stackup info: {}', str(e), level='warning')
+                    self._log('Failed parsing stackup info: {}', str(e), level='warning') 
 
         board_thickness = 0.0
         accumulate = None
-        for item in self.stackup:
+        for item in self.stackup: 
             layer, name = self.findLayer(item[0], 99)
             self._stackup_map[unquote(name)] = item
             thickness = item[2]
@@ -787,8 +797,8 @@ class KicadFcad:
 
         # only respect stackup if all copper layers are specified
         coppers = self._copperLayers()
-        if self.stackup:
-            for _,name in coppers:
+        if self.stackup: 
+            for _,name in coppers: 
                 if unquote(name) not in self._stackup_map:
                     self._log('stackup info ignored because copper layer {} is not found',
                               name, level='warning')
